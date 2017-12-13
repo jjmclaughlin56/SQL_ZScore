@@ -1,0 +1,37 @@
+WITH CTE AS (SELECT 
+u.ya_project_nameidName
+,u.ya_project_nameid
+,fim.ya_bp_manufacturer_catalog_number
+,AVG(u.ya_spend_to_ea) AS 'Average'
+,STDEVP(u.ya_spend_to_ea) AS 'STDV'
+FROM [BP-CRMPRD].[BluePoint_MSCRM].[dbo].[ya_utilizationdata]u
+INNER JOIN [BP_CRM_Import_Staging].[dbo].[view_POST_IMPORT_BP_CRM_FIM]fim ON u.ya_bp_fac_item_masterid_po_data = fim.ya_bp_fac_item_masterid
+WHERE u.ya_spend_to_ea > '0' 
+AND u.ya_project_nameidName <> 'CAN LINERS'
+AND CAST(u.ya_end_date AS Date) >= '2016-07-31' and u.ya_bp_fac_item_masterid_po_data IS NOT NULL
+GROUP BY u.ya_project_nameidName
+,u.ya_project_nameid
+,fim.ya_bp_manufacturer_catalog_number)
+
+SELECT DISTINCT
+u.ya_facilityid
+,m.Member_Skey
+,u.ya_sub_facilityIdName
+,a.Analysis_Skey
+,fim.ya_bp_fac_item_masterid
+,fim.ya_bp_manufacturer_catalog_number
+,fim.ya_bp_uomname
+,fim.ya_bp_facility_uom
+,u.ya_spend_to_ea
+,CTE.Average
+,CTE.STDV
+,((u.ya_spend_to_ea-CTE.Average)/CTE.STDV) AS 'Z SCORE'
+FROM [BP-CRMPRD].[BluePoint_MSCRM].[dbo].[ya_utilizationdata]u 
+INNER JOIN [BP_CRM_Import_Staging].[dbo].[view_POST_IMPORT_BP_CRM_FIM]fim ON u.ya_bp_fac_item_masterid_po_data = fim.ya_bp_fac_item_masterid
+INNER JOIN [BP_DataWarehouse].[dbo].[dimAnalysis]a ON a.Analysis_ID = fim.[ya_project_nameid]
+INNER JOIN [BP_DataWarehouse].[dbo].[dimMember]m ON m.Account_ID = u.ya_facilityid
+INNER JOIN CTE ON CTE.ya_project_nameid = a.Analysis_ID
+AND CTE.ya_bp_manufacturer_catalog_number = fim.ya_bp_manufacturer_catalog_number 
+WHERE CAST(u.ya_end_date AS Date) = '2017-10-31' AND u.ya_spend_to_ea > '0'
+AND u.ya_project_nameidName <> 'Can Liners'
+AND CTE.STDV <> '0'
